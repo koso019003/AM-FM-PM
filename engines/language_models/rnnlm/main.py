@@ -1,16 +1,16 @@
 import collections
 import numpy as np
-import os
 import tensorflow as tf
 import codecs
 import sentencepiece as spm
-import word2vec
+from . import word2vec
 import pickle
+import os
 from tqdm import tqdm
 from tensorflow.contrib import rnn
 from six.moves import range
 
-flags = tf.app.flags
+flags = tf.flags
 logging = tf.logging
 
 # load sentencepiece tokenizer
@@ -238,100 +238,43 @@ def decay_learning_rate(session, v_perplexity):
         session.run(inc_gstep)
 
 
-if __name__ == "__main__":
-
-    num_files = 3
-
-    dir_name = FLAGS.data_path
-
-    filenames = ['train_clean_{}.txt'.format(FLAGS.data_size), 'valid_clean.txt', 'test_clean.txt']
-
-    model_path = FLAGS.model_path
-    if not os.path.exists(model_path):
-        os.mkdir(model_path)
-
-    # ## Reading data
-    # Data will be stored in a list of lists where the each list represents a document and document is a list of words. We will then break the text into words.
-
-    global documents
-
-    documents = []
-
-    for i in range(num_files):
-        print('\nProcessing file %s' % os.path.join(dir_name, filenames[i]))
-
-        words = read_data(os.path.join(dir_name, filenames[i]))
-
-        documents.append(words)
-        print('Data size (Characters) (Document %d) %d' % (i, len(words)))
-        print('Sample string (Document %d) %s' % (i, words[:50]))
-
-    # ## Building the Dictionaries
-    # Builds the following. To understand each of these elements, let us also assume the text "I like to go to school"
-    # 
-    # * `dictionary`: maps a string word to an ID (e.g. {I:0, like:1, to:2, go:3, school:4})
-    # * `reverse_dictionary`: maps an ID to a string word (e.g. {0:I, 1:like, 2:to, 3:go, 4:school}
-    # * `count`: List of list of (word, frequency) elements (e.g. [(I,1),(like,1),(to,2),(go,1),(school,1)]
-    # * `data` : Contain the string of text we read, where string words are replaced with word IDs (e.g. [0, 1, 2, 3, 2, 4])
-    # 
-    # It also introduces an additional special token `UNK` to denote rare words to are too rare to make use of.
-
-    if not FLAGS.use_sp:
-        # print some statistics about data
-        data_list, dictionary, reverse_dictionary = build_dataset(documents, model_path)
-        print('Sample data', data_list[0][:10])
-        print('Sample data', data_list[1][:10])
-        print('Vocabulary: ', len(dictionary))
-        vocabulary_size = len(dictionary)
-    else:
-        data_list = build_dataset_sp(documents)
-        print('Sample data', data_list[0][:10])
-        print('Sample data', data_list[1][:10])
+def define_graph(return_key=None):
+    if FLAGS.use_sp:
+        # load sentencepiece tokenizer
+        sp = spm.SentencePieceProcessor()
+        sp.Load(FLAGS.tokenizer_path)
         vocabulary_size = sp.GetPieceSize()
-    del documents  # To reduce memory.
-
-    # data_len = max([len(data) for data in data_list])
-
-    # Train or load word2vec embeddings
-    embedding_name = os.path.join(model_path, FLAGS.embedding_name)
-    learn_w2v(1, [data_list[0]], reverse_dictionary, FLAGS.embedding_size, vocabulary_size, embedding_name,
-              len(data_list[0]))
-
-    # =========================================================
-    # Define Graph
 
     # Number of neurons in the hidden state variables
     num_nodes = [int(node) for node in FLAGS.num_nodes]
 
     # ## Defining Inputs and Outputs
-    # 
-    # In the code we define two different types of inputs. 
+    #
+    # In the code we define two different types of inputs.
     # * Training inputs (The stories we downloaded) (batch_size > 1 with unrolling)
     # * Validation inputs (An unseen validation dataset) (bach_size =1, no unrolling)
     # * Test inputs (New story we are going to generate) (batch_size=1, no unrolling)
-
-    tf.reset_default_graph()
 
     # Training Input data.
     train_inputs, train_labels = [], []
     train_labels_ohe = []
     # Defining unrolled training inputs
     for ui in range(FLAGS.seq_len):
-        train_inputs.append(tf.placeholder(tf.int32, shape=[FLAGS.batch_size], name='train_inputs_%d' % ui))
-        train_labels.append(tf.placeholder(tf.int32, shape=[FLAGS.batch_size], name='train_labels_%d' % ui))
+        train_inputs.append(tf.compat.v1.placeholder(tf.int32, shape=[FLAGS.batch_size], name='train_inputs_%d' % ui))
+        train_labels.append(tf.compat.v1.placeholder(tf.int32, shape=[FLAGS.batch_size], name='train_labels_%d' % ui))
         train_labels_ohe.append(tf.one_hot(train_labels[ui], vocabulary_size))
 
     # Validation data placeholders
-    valid_inputs = tf.placeholder(tf.int32, shape=[1], name='valid_inputs')
-    valid_labels = tf.placeholder(tf.int32, shape=[1], name='valid_labels')
+    valid_inputs = tf.compat.v1.placeholder(tf.int32, shape=[1], name='valid_inputs')
+    valid_labels = tf.compat.v1.placeholder(tf.int32, shape=[1], name='valid_labels')
     valid_labels_ohe = tf.one_hot(valid_labels, vocabulary_size)
 
     # Text generation: batch 1, no unrolling.
-    test_input = tf.placeholder(tf.int32, shape=[1], name='test_input')
+    test_input = tf.compat.v1.placeholder(tf.int32, shape=[1], name='test_input')
 
     # ## Loading Word Embeddings to TensorFlow
     # We load the previously learned and stored embeddings to TensorFlow and define tensors to hold embeddings
-    embed_mat = np.load(embedding_name)
+    embed_mat = np.load(os.path.join(FLAGS.model_path, FLAGS.embedding_name))
     embeddings_size = embed_mat.shape[1]
 
     embed_init = tf.constant(embed_mat)
@@ -352,13 +295,13 @@ if __name__ == "__main__":
     test_input_embeds = tf.nn.embedding_lookup(embeddings, test_input)
 
     # ## Defining Model Parameters
-    # 
+    #
     # Now we define model parameters. Compared to RNNs, LSTMs have a large number of parameters. Each gate (input, forget, memory and output) has three different sets of parameters.
 
     print('Defining softmax weights and biases')
     # Softmax Classifier weights and biases.
-    w = tf.Variable(tf.truncated_normal([num_nodes[-1], vocabulary_size], stddev=0.01))
-    b = tf.Variable(tf.random_uniform([vocabulary_size], 0.0, 0.01))
+    w = tf.Variable(tf.random.truncated_normal([num_nodes[-1], vocabulary_size], stddev=0.01))
+    b = tf.Variable(tf.random.uniform([vocabulary_size], 0.0, 0.01))
 
     print('Defining the LSTM cell')
     # Defining a deep LSTM from Tensorflow RNN API
@@ -378,7 +321,7 @@ if __name__ == "__main__":
         ) for lstm in cells
     ]
 
-    # We first define a MultiRNNCell Object that uses the 
+    # We first define a MultiRNNCell Object that uses the
     # Dropout wrapper (for training)
     stacked_dropout_cell = tf.nn.rnn_cell.MultiRNNCell(dropout_cells)
     # Here we define a MultiRNNCell that does not use dropout
@@ -417,8 +360,9 @@ if __name__ == "__main__":
     time_major_train_labels = tf.reshape(tf.concat(train_labels, axis=0), [FLAGS.seq_len, FLAGS.batch_size])
 
     # Perplexity related operation
-    train_perplexity_without_exp = tf.reduce_sum(tf.concat(train_labels_ohe, 0) * -tf.log(train_prediction + 1e-10)) / (
-            FLAGS.seq_len * FLAGS.batch_size)
+    train_perplexity_without_exp = tf.reduce_sum(
+        tf.concat(train_labels_ohe, 0) * -tf.math.log(train_prediction + 1e-10)) / (
+                                           FLAGS.seq_len * FLAGS.batch_size)
 
     # =========================================================
     # Validation inference logic
@@ -441,7 +385,7 @@ if __name__ == "__main__":
     valid_prediction = tf.nn.softmax(valid_logits)
 
     # Perplexity related operation
-    valid_perplexity_without_exp = tf.reduce_sum(valid_labels_ohe * -tf.log(valid_prediction + 1e-10))
+    valid_perplexity_without_exp = tf.reduce_sum(valid_labels_ohe * -tf.math.log(valid_prediction + 1e-10))
 
     # ## Calculating LSTM Loss
     # We calculate the training loss of the LSTM here. It's a typical cross entropy loss calculated over all the scores we obtained for training data (`loss`) and averaged and summed in a specific way.
@@ -458,6 +402,84 @@ if __name__ == "__main__":
     )
 
     loss = tf.reduce_sum(loss)
+
+    return_dict = {
+        "for_train": (train_inputs, train_labels, train_perplexity_without_exp,
+                      valid_inputs, valid_labels, valid_perplexity_without_exp, loss),
+        "for_eval": (valid_inputs, valid_labels, valid_perplexity_without_exp)
+    }
+
+    if return_key:
+        assert return_key in return_dict.keys()
+        return return_dict[return_key]
+
+    return return_dict["for_train"]
+
+
+if __name__ == "__main__":
+
+    num_files = 3
+
+    dir_name = FLAGS.data_path
+
+    filenames = ['train_clean_{}.txt'.format(FLAGS.data_size), 'valid_clean.txt', 'test_clean.txt']
+
+    model_path = FLAGS.model_path
+    if not os.path.exists(model_path):
+        os.mkdir(model_path)
+
+    # ## Reading data
+    # Data will be stored in a list of lists where the each list represents a document and document is a list of words. We will then break the text into words.
+
+    global documents
+
+    documents = []
+
+    for i in range(num_files):
+        print('\nProcessing file %s' % os.path.join(dir_name, filenames[i]))
+
+        words = read_data(os.path.join(dir_name, filenames[i]))
+
+        documents.append(words)
+        print('Data size (Characters) (Document %d) %d' % (i, len(words)))
+        print('Sample string (Document %d) %s' % (i, words[:50]))
+
+    # ## Building the Dictionaries
+    # Builds the following. To understand each of these elements, let us also assume the text "I like to go to school"
+    #
+    # * `dictionary`: maps a string word to an ID (e.g. {I:0, like:1, to:2, go:3, school:4})
+    # * `reverse_dictionary`: maps an ID to a string word (e.g. {0:I, 1:like, 2:to, 3:go, 4:school}
+    # * `count`: List of list of (word, frequency) elements (e.g. [(I,1),(like,1),(to,2),(go,1),(school,1)]
+    # * `data` : Contain the string of text we read, where string words are replaced with word IDs (e.g. [0, 1, 2, 3, 2, 4])
+    #
+    # It also introduces an additional special token `UNK` to denote rare words to are too rare to make use of.
+
+    if not FLAGS.use_sp:
+        # print some statistics about data
+        data_list, dictionary, reverse_dictionary = build_dataset(documents, model_path)
+        print('Sample data', data_list[0][:10])
+        print('Sample data', data_list[1][:10])
+        print('Vocabulary: ', len(dictionary))
+        vocabulary_size = len(dictionary)
+    else:
+        data_list = build_dataset_sp(documents)
+        print('Sample data', data_list[0][:10])
+        print('Sample data', data_list[1][:10])
+        vocabulary_size = sp.GetPieceSize()
+    del documents  # To reduce memory.
+
+    # data_len = max([len(data) for data in data_list])
+
+    # Train or load word2vec embeddings
+    embedding_name = os.path.join(model_path, FLAGS.embedding_name)
+    learn_w2v(1, [data_list[0]], reverse_dictionary, FLAGS.embedding_size, vocabulary_size, embedding_name,
+              len(data_list[0]))
+
+    # =========================================================
+    # Define Graph
+    tf.compat.v1.reset_default_graph()
+    train_inputs, train_labels, train_perplexity_without_exp, \
+    valid_inputs, valid_labels, valid_perplexity_without_exp, loss = define_graph()
 
     # ## Defining Learning Rate and the Optimizer with Gradient Clipping
     # Here we define the learning rate and the optimizer we're going to use. We will be using the Adam optimizer as it is one of the best optimizers out there. Furthermore we use gradient clipping to prevent any gradient explosions.
@@ -484,7 +506,7 @@ if __name__ == "__main__":
     inc_gstep = tf.assign(gstep, gstep + 1)
 
     # ### Learning rate Decay Logic
-    # 
+    #
     # Here we define the logic to decrease learning rate whenever the validation perplexity does not decrease
     # Learning rate decay related
     # If valid perpelxity does not decrease
@@ -497,7 +519,7 @@ if __name__ == "__main__":
     best_perplexity = 1e10
 
     # ### Running Training, Validation and Generation
-    # 
+    #
     # We traing the LSTM on existing training data, check the validaiton perplexity on an unseen chunk of text and generate a fresh segment of text
     train_perplexity_ot = []
     valid_perplexity_ot = []
@@ -583,7 +605,7 @@ if __name__ == "__main__":
         for t_step in tqdm(range(test_steps_per_document)):
             utest_data, utest_labels = test_gen.unroll_batches()
 
-            # Run validation phase related TensorFlow operations       
+            # Run validation phase related TensorFlow operations
             t_perp = session.run(
                 valid_perplexity_without_exp,
                 feed_dict={valid_inputs: utest_data[0], valid_labels: utest_labels[0]}

@@ -23,8 +23,10 @@ import collections
 import json
 import re
 
-import modeling
-import tokenization
+from . import modeling
+from . import tokenization
+# import tokenization
+# import modeling
 import tensorflow as tf
 
 flags = tf.flags
@@ -78,6 +80,7 @@ flags.DEFINE_bool(
     "since it is much faster.")
 
 flags.DEFINE_string("bert_model_dir", None, "")
+
 
 
 class InputExample(object):
