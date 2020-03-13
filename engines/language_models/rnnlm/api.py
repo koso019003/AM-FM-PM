@@ -4,7 +4,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 import numpy as np
-from .main import FLAGS, define_graph
+from AM_FM_PM.engines.language_models.rnnlm.main import FLAGS, define_graph
 import sentencepiece as spm
 import codecs
 import pickle

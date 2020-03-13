@@ -1,25 +1,26 @@
 import numpy as np
 from sklearn.metrics.pairwise import cosine_similarity
-from .dynamic_import import dynamic_import
+from AM_FM_PM.api.dynamic_import import dynamic_import
 import tensorflow as tf
 import os
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
+# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+# tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 flags = tf.flags
 flags.DEFINE_string('lm_model', "rnnlm", 'language model name')
 flags.DEFINE_string('lm_dataset', "dstc6", 'dataset name which the lm trained on it')
-flags.DEFINE_string('do_dstc_eval', "bert", 'sentence encoder model name')
-flags.DEFINE_string('se_model', "dstc6", 'dataset name which the se trained on it')
+flags.DEFINE_string('se_model', "bert", 'sentence encoder model name')
+flags.DEFINE_string('se_dataset', "dstc6", 'dataset name which the se trained on it')
 
 args = flags.FLAGS
 args.mark_as_parsed()
 
 model_flags = {
     "bert": {"init_checkpoint": None,
-             "bert_config_file": "/media/datadrive/PycharmProject/Singapore/A_F_PM/"
+             "bert_config_file": "/media/datadrive/PycharmProject/Singapore/A_F_PM/AM_FM_PM/"
                                  "model_pretrain/bert/uncased_L-12_H-768_A-12/bert_config.json",
-             "vocab_file": "/media/datadrive/PycharmProject/Singapore/A_F_PM/"
+             "vocab_file": "/media/datadrive/PycharmProject/Singapore/A_F_PM/AM_FM_PM/"
                            "model_pretrain/bert/uncased_L-12_H-768_A-12/vocab.txt",
              },
     "rnnlm": {

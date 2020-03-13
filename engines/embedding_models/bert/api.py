@@ -18,26 +18,23 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-from . import tokenization
-# import tokenization
+from AM_FM_PM.engines.embedding_models.bert import tokenization
 import tensorflow as tf
 import numpy as np
 from numpy import linalg
 
-# from modeling import BertModel, BertConfig
-from .modeling import BertModel, BertConfig
-# from extract_features import FLAGS, InputFeatures
-from .extract_features import FLAGS, InputFeatures
+from AM_FM_PM.engines.embedding_models.bert.modeling import BertModel, BertConfig
+from AM_FM_PM.engines.embedding_models.bert.extract_features import FLAGS, InputFeatures
 
 
 class EncodeModel:
     @staticmethod
     def ini_flag(kwargs=None):
         FLAGS.set_default("bert_config_file",
-                          "/media/datadrive/PycharmProject/Singapore/A_F_PM/model_pretrain/bert/"
+                          "/media/datadrive/PycharmProject/Singapore/A_F_PM/AM_FM_PM/model_pretrain/bert/"
                           "uncased_L-12_H-768_A-12/bert_config.json")
         FLAGS.set_default("vocab_file",
-                          "/media/datadrive/PycharmProject/Singapore/A_F_PM/model_pretrain/bert/"
+                          "/media/datadrive/PycharmProject/Singapore/A_F_PM/AM_FM_PM/model_pretrain/bert/"
                           "uncased_L-12_H-768_A-12/vocab.txt")
         FLAGS.set_default("init_checkpoint",
                           "/media/datadrive/PycharmProject/Singapore/A_F_PM/AM_FM_PM/examples/dstc6/pretrain/bert/")
@@ -190,4 +187,4 @@ class EncodeModel:
 if __name__ == "__main__":
     tf.compat.v1.logging.set_verbosity("DEBUG")
     bert = EncodeModel()
-    # bert.test()
+    bert.test()

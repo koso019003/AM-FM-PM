@@ -19,7 +19,7 @@ examples/dstc6/Data/
 
 
 # Model
-model_pretrain/
+model_pretrain/bert/*
 
 examples/dstc6/pretrain/*
 examples/dstc6/result/*
