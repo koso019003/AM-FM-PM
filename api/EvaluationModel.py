@@ -3,9 +3,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 from AM_FM_PM.api.dynamic_import import dynamic_import
 import tensorflow as tf
 import os
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
-# os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
-# tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
+# os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 flags = tf.flags
 flags.DEFINE_string('lm_model', "rnnlm", 'language model name')
