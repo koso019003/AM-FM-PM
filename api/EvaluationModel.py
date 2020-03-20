@@ -51,6 +51,14 @@ def load_language_model(lm="language_model_name", dataset="dataset_name"):
 
     kwargs = model_flags[lm]
     model_dir = kwargs["model_path"].format(dataset, lm)
+
+    # TODO ues general method
+    # model_dir = model_dir + '/20200316_best'
+    model_dir = model_dir + '/chen'
+    kwargs["num_nodes"] = "1500,1000,500"
+    kwargs["tokenizer_path"] = model_dir + "/bpe_full.model"
+    kwargs["bpe_vocab"] = model_dir + "/bpe_full.vocab"
+
     kwargs["model_path"] = model_dir
 
     return model_class(kwargs=kwargs)
@@ -59,6 +67,7 @@ def load_language_model(lm="language_model_name", dataset="dataset_name"):
 def load_se_model(se="sentence_encoder_name", dataset="dataset_name"):
     # return se model
     model_dir = "/media/datadrive/PycharmProject/Singapore/A_F_PM/AM_FM_PM/examples/{}/pretrain/{}".format(dataset, se)
+
     model_class_path = "AM_FM_PM.engines.embedding_models.{}.api:EncodeModel".format(se)
     model_class = dynamic_import(model_class_path)
 
